@@ -138,6 +138,15 @@ fn connect_to_device(port: u16) -> Result<ADBTcpDevice> {
 }
 
 pub fn run(port: u16, package_name: &String, allow_shell: bool) -> Result<()> {
+    // If KernelSU is already loaded, skip the whole adb-root bootstrap.
+    // Otherwise every cold start of the Manager (app zygote preload) would
+    // re-run magica, restart adbd and force-stop/restart the Manager in a
+    // loop, eventually destabilizing the system.
+    if ksuinit::has_kernelsu() {
+        info!("KernelSU already active, skip magica");
+        return Ok(());
+    }
+
     enable_adb_root(port)?;
 
     let mut device = connect_to_device(port)?;

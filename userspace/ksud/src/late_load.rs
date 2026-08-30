@@ -41,7 +41,8 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
     dump_process_info("late-load start");
 
     // 1. Check if KernelSU is already loaded
-    if ksuinit::has_kernelsu() {
+    let freshly_loaded = !ksuinit::has_kernelsu();
+    if !freshly_loaded {
         info!("KernelSU already loaded, skip loading ko");
     } else {
         // 2. Detect current KMI version
@@ -129,18 +130,24 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
     // 13. Execute boot-completed stage scripts (non-blocking)
     init_event::run_stage("boot-completed", false);
 
-    // 14. Restart Manager so it gets a fresh ksu fd from the newly loaded kernel module
-    info!("Restarting KernelSU Manager {package_name}...");
-    let _ = Command::new("am")
-        .args(["force-stop", package_name])
-        .status();
-    let _ = Command::new("am")
-        .args([
-            "start",
-            "-n",
-            &format!("{package_name}/me.weishu.kernelsu.ui.MainActivity"),
-        ])
-        .status();
+    // 14. Restart Manager only when the module was freshly loaded, so it gets
+    // a fresh ksu fd. If KernelSU was already active, skip this to avoid
+    // force-stop/start loops on every Manager cold start.
+    if freshly_loaded {
+        info!("Restarting KernelSU Manager {package_name}...");
+        let _ = Command::new("am")
+            .args(["force-stop", package_name])
+            .status();
+        let _ = Command::new("am")
+            .args([
+                "start",
+                "-n",
+                &format!("{package_name}/me.weishu.kernelsu.ui.MainActivity"),
+            ])
+            .status();
+    } else {
+        info!("KernelSU already active, not restarting Manager");
+    }
 
     Ok(())
 }
