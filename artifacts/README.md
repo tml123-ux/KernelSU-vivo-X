@@ -8,7 +8,9 @@
 |---|---|
 | `KernelSU-v3.3.0.apk` | KernelSU Manager **官方 v3.3.0 APK**（官方签名）。Manager 必须使用官方签名版，见下方"签名校验"。 |
 | `ksud` | **修复版** ksud 可执行文件（含 android16-6.12 内核模块资产） |
+| `libksud.so` | 与 `ksud` 同构的修复版（用于覆盖 Manager 内嵌官方版，见下方"卡死重启修复"） |
 | `install.sh` | 首次安装脚本（电脑端 adb 执行） |
+| `fix-magica.sh` | 替换 Manager 内 libksud.so 为修复版，解决退出后台再打开卡死重启 |
 | `reload.sh` | 每次重启后重新加载 LKM 脚本 |
 
 ## 签名校验（为什么 Manager 必须用官方 APK）
@@ -30,6 +32,18 @@ cd artifacts
 # 手机重启后重新加载（adb root 与 LKM 每次开机失效）
 ./reload.sh
 ```
+
+## 卡死重启修复（退出后台再打开卡死系统）
+
+Manager 冷启动经 `AppZygotePreload` 执行 APK 解压目录内的 `libksud.so`。官方版每次冷启动都重跑 magica（重启 adbd → force-stop/start Manager → 再次冷启动），已激活时仍不跳过，形成死循环卡死系统。
+
+修复版 `libksud.so`（`magica::run` 检测 KernelSU 已激活则直接跳过）可覆盖 Manager 的 lib 目录，替换一次长期有效：
+
+```bash
+./fix-magica.sh
+```
+
+注意：重装/更新 Manager APK 后 `libksud.so` 恢复官方版，需重新执行。
 
 ## 修复说明
 
