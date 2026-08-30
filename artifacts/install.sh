@@ -24,8 +24,15 @@ echo "[-] 加载 kernelsu.ko (LKM) 并启动 ksud"
 adb shell /data/adb/ksud late-load --package-name me.weishu.kernelsu
 sleep 2
 
-echo "[-] 安装 KernelSU Manager"
-adb install -r KernelSU-v3.3.0.apk
+echo "[-] 安装 KernelSU Manager (官方签名版)"
+if ! adb install -r KernelSU-v3.3.0.apk; then
+    echo
+    echo "!! 安装失败: 手机可能已装过其他签名的 KernelSU Manager。"
+    echo "   请先卸载旧版本再安装官方 APK:"
+    echo "   adb uninstall me.weishu.kernelsu"
+    echo "   adb install KernelSU-v3.3.0.apk"
+    exit 1
+fi
 
 echo "[-] 验证内核模块是否加载"
 adb shell ls /sys/kernel/ksu 2>/dev/null && echo "OK: /sys/kernel/ksu 存在" || echo "警告: 未发现 /sys/kernel/ksu, 可能加载失败, 请查看 logcat"
