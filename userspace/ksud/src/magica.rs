@@ -1,4 +1,3 @@
-use adb_client::ADBDeviceExt;
 use adb_client::tcp::ADBTcpDevice;
 use anyhow::{Context, Result, bail};
 use log::{error, info};
@@ -139,6 +138,7 @@ fn connect_to_device(port: u16) -> Result<ADBTcpDevice> {
     bail!("Failed to connect to ADB device after {MAX_RETRIES} attempts")
 }
 
+#[allow(clippy::unnecessary_wraps)]
 pub fn run(port: u16, package_name: &String, allow_shell: bool) -> Result<()> {
     // Magica auto-activation is disabled on this device.
     //

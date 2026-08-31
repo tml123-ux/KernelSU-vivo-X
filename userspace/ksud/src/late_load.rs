@@ -42,7 +42,7 @@ pub fn run(package_name: &String, kmi: Option<String>, allow_shell: bool) -> Res
 
     // 1. Check if KernelSU is already loaded
     let freshly_loaded = !ksuinit::has_kernelsu();
-    if !freshly_loaded {
+    if ksuinit::has_kernelsu() {
         info!("KernelSU already loaded, skip loading ko");
     } else {
         // 2. Detect current KMI version
