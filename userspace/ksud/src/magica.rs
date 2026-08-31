@@ -32,6 +32,7 @@ fn exec_shell_commands(commands: &[(&str, &[&str])], log_prefix: &str) -> Result
     Ok(())
 }
 
+#[allow(dead_code)]
 fn enable_adb_root(port: u16) -> Result<()> {
     // We are in limited root by magica
     anyhow::ensure!(
@@ -119,6 +120,7 @@ pub fn disable_adb_root() -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn connect_to_device(port: u16) -> Result<ADBTcpDevice> {
     const MAX_RETRIES: u32 = 30;
     for attempt in 1..=MAX_RETRIES {
@@ -138,44 +140,21 @@ fn connect_to_device(port: u16) -> Result<ADBTcpDevice> {
 }
 
 pub fn run(port: u16, package_name: &String, allow_shell: bool) -> Result<()> {
-    // If KernelSU is already loaded, skip the whole adb-root bootstrap.
-    // Otherwise every cold start of the Manager (app zygote preload) would
-    // re-run magica, restart adbd and force-stop/restart the Manager in a
-    // loop, eventually destabilizing the system.
-    if ksuinit::has_kernelsu() {
-        info!("KernelSU already active, skip magica");
-        return Ok(());
-    }
-
-    enable_adb_root(port)?;
-
-    let mut device = connect_to_device(port)?;
-
-    let self_path = std::env::current_exe().context("Failed to get self exe path")?;
-
-    // Execute late-load with --post-magica via adb shell.
-    // The late-load process has full root + su domain and will:
-    // 1. Load kernelsu.ko, enforce SELinux, run stage scripts
-    // 2. Restore adb properties (disable adb root/tcp mode)
-    let allow_shell_arg = if allow_shell { " --allow-shell" } else { "" };
-    let cmd = format!(
-        "{} late-load --post-magica --package-name {}{}",
-        self_path.display(),
-        package_name,
-        allow_shell_arg
-    );
-    info!("Executing '{cmd}' via adb shell...");
-    let mut stdout = Vec::new();
-    let mut stderr = Vec::new();
-    if let Err(e) = device.shell_command(&cmd, Some(&mut stdout), Some(&mut stderr)) {
-        info!("adb shell finished with error (may be expected): {e}");
-    }
-    if !stdout.is_empty() {
-        info!("stdout: {}", String::from_utf8_lossy(&stdout));
-    }
-    if !stderr.is_empty() {
-        info!("stderr: {}", String::from_utf8_lossy(&stderr));
-    }
-
+    // Magica auto-activation is disabled on this device.
+    //
+    // The AppZygote preload child (forked by AppZygotePreload) inherits
+    // AppZygote's seccomp filter. The kernel only whitelists the reboot
+    // syscall for the manager uid via the setresuid hook, and the child
+    // uses setuid(0) (not setresuid), so ksuinit::has_kernelsu() always
+    // returns false here. Falling through to enable_adb_root() + late-load
+    // from this context restarts adbd and reloads the kernel module while
+    // the system is mid-boot, which destabilizes the device and ends in a
+    // freeze + reboot.
+    //
+    // Activation on this device is done manually with:
+    //   <libksud.so> late-load --allow-shell --package-name me.weishu.kernelsu
+    // so magica simply does nothing.
+    let _ = (port, package_name, allow_shell);
+    info!("magica auto-activation disabled on this device, skip");
     Ok(())
 }
